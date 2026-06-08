@@ -85,8 +85,10 @@ export default function App() {
     try {
       let items = [];
       if (type === "shorts") {
+        const regionQuery = { KR: "%23Shorts+한국", US: "%23Shorts+trending", JP: "%23Shorts+日本" };
+        const q = regionQuery[reg] || "%23Shorts";
         const searchRes = await fetch(
-          `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&videoDuration=short&q=%23Shorts&regionCode=${reg}&order=viewCount&maxResults=20&key=${API_KEY}`
+          `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&videoDuration=short&q=${q}&relevanceLanguage=${reg === "KR" ? "ko" : reg === "JP" ? "ja" : "en"}&regionCode=${reg}&order=viewCount&maxResults=20&key=${API_KEY}`
         );
         const searchData = await searchRes.json();
         if (searchData.error) throw new Error(searchData.error.message);
