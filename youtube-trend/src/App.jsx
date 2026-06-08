@@ -1,9 +1,9 @@
 import { useState, useEffect } from "react";
 
 const REGIONS = [
-  { code: "KR", label: "🇰🇷 한국" },
-  { code: "US", label: "🇺🇸 미국" },
-  { code: "JP", label: "🇯🇵 일본" },
+  { code: "KR", label: "🇰🇷 한국", lang: "ko", shortsQ: "쇼츠" },
+  { code: "US", label: "🇺🇸 미국", lang: "en", shortsQ: "shorts" },
+  { code: "JP", label: "🇯🇵 일본", lang: "ja", shortsQ: "ショート" },
 ];
 
 const CATEGORIES = [
@@ -15,8 +15,6 @@ const CATEGORIES = [
   { id: "17", label: "⚽ 스포츠" },
   { id: "22", label: "👤 브이로그" },
 ];
-
-const SHORTS_QUERY = { KR: "쇼츠", US: "shorts", JP: "ショート" };
 
 function timeAgo(dateStr) {
   const diff = (Date.now() - new Date(dateStr)) / 1000;
@@ -87,21 +85,40 @@ export default function App() {
     setLoading(true);
     setError("");
     setVideos([]);
+
+    const regionInfo = REGIONS.find(r => r.code === reg);
+    const lang = regionInfo?.lang || "ko";
+    const shortsQ = encodeURIComponent(regionInfo?.shortsQ || "shorts");
+
     try {
       let items = [];
 
       if (type === "shorts") {
-        const q = encodeURIComponent(SHORTS_QUERY[reg] || "shorts");
+        // 지역별 언어로 검색 + 해당 언어 영상만 필터
         const searchRes = await fetch(
-          `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&videoDuration=short&q=${q}&regionCode=${reg}&order=viewCount&maxResults=20&key=${API_KEY}`
+          `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&videoDuration=short&q=${shortsQ}&regionCode=${reg}&relevanceLanguage=${lang}&order=viewCount&maxResults=30&key=${API_KEY}`
         );
         const searchData = await searchRes.json();
         if (searchData.error) throw new Error(searchData.error.message);
+
         const videoIds = (searchData.items || []).map(i => i.id.videoId).filter(Boolean).join(",");
         if (videoIds) {
-          const statsRes = await fetch(`https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics&id=${videoIds}&key=${API_KEY}`);
+          const statsRes = await fetch(
+            `https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics&id=${videoIds}&key=${API_KEY}`
+          );
           const statsData = await statsRes.json();
-          items = statsData.items || [];
+          if (statsData.error) throw new Error(statsData.error.message);
+
+          // 해당 언어 영상만 필터링
+          items = (statsData.items || []).filter(item => {
+            const audioLang = item.snippet.defaultAudioLanguage || "";
+            const defLang = item.snippet.defaultLanguage || "";
+            // 언어 정보가 없으면 포함, 있으면 해당 언어만
+            return !audioLang || audioLang.startsWith(lang) || defLang.startsWith(lang);
+          });
+
+          // 필터 후 너무 적으면 필터 없이 전체 사용
+          if (items.length < 5) items = statsData.items || [];
         }
       } else {
         let url = `https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics&chart=mostPopular&regionCode=${reg}&maxResults=20&key=${API_KEY}`;
