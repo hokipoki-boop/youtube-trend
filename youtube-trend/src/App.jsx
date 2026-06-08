@@ -1,9 +1,15 @@
 import { useState, useEffect } from "react";
 
 const REGIONS = [
-  { code: "KR", label: "🇰🇷 한국" },
-  { code: "US", label: "🇺🇸 미국" },
-  { code: "JP", label: "🇯🇵 일본" },
+  { code: "KR", label: "🇰🇷 한국", lang: "ko" },
+  { code: "US", label: "🇺🇸 미국", lang: "en" },
+  { code: "JP", label: "🇯🇵 일본", lang: "ja" },
+];
+
+const PERIODS = [
+  { label: "오늘", days: 1 },
+  { label: "7일", days: 7 },
+  { label: "30일", days: 30 },
 ];
 
 function timeAgo(dateStr) {
@@ -33,11 +39,8 @@ function VideoCard({ video, rank }) {
         {rank}
       </div>
       <div style={{ position: "relative", flexShrink: 0 }}>
-        <img
-          src={video.thumbnail}
-          alt={video.title}
-          style={{ width: 100, height: 56, borderRadius: 8, objectFit: "cover", display: "block" }}
-        />
+        <img src={video.thumbnail} alt={video.title}
+          style={{ width: 100, height: 56, borderRadius: 8, objectFit: "cover", display: "block" }} />
         {video.isShort && (
           <span style={{
             position: "absolute", bottom: 4, left: 4,
@@ -48,13 +51,9 @@ function VideoCard({ video, rank }) {
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{
-          fontSize: 13, fontWeight: 600, color: "#111",
-          marginBottom: 3, lineHeight: 1.4,
-          overflow: "hidden", display: "-webkit-box",
-          WebkitLineClamp: 2, WebkitBoxOrient: "vertical"
-        }}>
-          {video.title}
-        </div>
+          fontSize: 13, fontWeight: 600, color: "#111", marginBottom: 3, lineHeight: 1.4,
+          overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical"
+        }}>{video.title}</div>
         <div style={{ fontSize: 11, color: "#999", marginBottom: 6 }}>{video.channelTitle} · {timeAgo(video.publishedAt)}</div>
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
           <span style={{ background: "#f5f5f5", borderRadius: 99, padding: "2px 9px", fontSize: 11, color: "#666" }}>👁 {formatCount(video.viewCount)}</span>
@@ -66,6 +65,36 @@ function VideoCard({ video, rank }) {
   );
 }
 
+function TabBtn({ active, onClick, children }) {
+  return (
+    <button onClick={onClick} style={{
+      background: active ? "#111" : "#fff", color: active ? "#fff" : "#555",
+      border: `1px solid ${active ? "#111" : "#ddd"}`,
+      borderRadius: 99, padding: "6px 16px", fontSize: 13, cursor: "pointer"
+    }}>{children}</button>
+  );
+}
+
+function RegionBtn({ active, onClick, children }) {
+  return (
+    <button onClick={onClick} style={{
+      background: active ? "#FF0000" : "#fff", color: active ? "#fff" : "#555",
+      border: `1px solid ${active ? "#FF0000" : "#ddd"}`,
+      borderRadius: 99, padding: "5px 14px", fontSize: 12, cursor: "pointer"
+    }}>{children}</button>
+  );
+}
+
+function PeriodBtn({ active, onClick, children }) {
+  return (
+    <button onClick={onClick} style={{
+      background: active ? "#4A90E2" : "#fff", color: active ? "#fff" : "#555",
+      border: `1px solid ${active ? "#4A90E2" : "#ddd"}`,
+      borderRadius: 99, padding: "5px 14px", fontSize: 12, cursor: "pointer"
+    }}>{children}</button>
+  );
+}
+
 export default function App() {
   const API_KEY = process.env.REACT_APP_YOUTUBE_API_KEY;
   const [videos, setVideos] = useState([]);
@@ -73,26 +102,39 @@ export default function App() {
   const [error, setError] = useState("");
   const [region, setRegion] = useState("KR");
   const [tab, setTab] = useState("trending");
+  const [period, setPeriod] = useState(7);
 
   const today = new Date().toLocaleDateString("ko-KR", {
     year: "numeric", month: "long", day: "numeric", weekday: "long"
   });
 
-  async function fetchVideos(reg, type) {
+  async function fetchVideos(reg, type, days) {
     setLoading(true);
     setError("");
     setVideos([]);
+
+    const regionInfo = REGIONS.find(r => r.code === reg);
+    const lang = regionInfo?.lang || "ko";
+
+    const publishedAfter = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+
     try {
       let items = [];
+
       if (type === "shorts") {
-        const regionQuery = { KR: "%23Shorts+한국", US: "%23Shorts+trending", JP: "%23Shorts+日本" };
-        const q = regionQuery[reg] || "%23Shorts";
+        const shortsQuery = { KR: "%23Shorts", US: "%23Shorts", JP: "%23Shorts" };
         const searchRes = await fetch(
-          `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&videoDuration=short&q=${q}&relevanceLanguage=${reg === "KR" ? "ko" : reg === "JP" ? "ja" : "en"}&regionCode=${reg}&order=viewCount&maxResults=20&key=${API_KEY}`
+          `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&videoDuration=short&q=${shortsQuery[reg]}&regionCode=${reg}&relevanceLanguage=${lang}&publishedAfter=${publishedAfter}&order=viewCount&maxResults=20&key=${API_KEY}`
         );
         const searchData = await searchRes.json();
         if (searchData.error) throw new Error(searchData.error.message);
-        const videoIds = (searchData.items || []).map(i => i.id.videoId).join(",");
+        // 해당 지역 언어 채널만 필터
+        const regionItems = (searchData.items || []).filter(i =>
+          i.snippet.defaultAudioLanguage === lang ||
+          i.snippet.defaultLanguage === lang ||
+          !i.snippet.defaultAudioLanguage
+        );
+        const videoIds = regionItems.map(i => i.id.videoId).join(",");
         if (videoIds) {
           const statsRes = await fetch(
             `https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics&id=${videoIds}&key=${API_KEY}`
@@ -101,12 +143,17 @@ export default function App() {
           items = statsData.items || [];
         }
       } else {
+        // 트렌딩은 regionCode로 정확하게 해당 국가 콘텐츠만 나옴
         const trendRes = await fetch(
           `https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics&chart=mostPopular&regionCode=${reg}&maxResults=20&key=${API_KEY}`
         );
         const trendData = await trendRes.json();
         if (trendData.error) throw new Error(trendData.error.message);
-        items = trendData.items || [];
+        items = (trendData.items || []).filter(i => {
+          const pub = new Date(i.snippet.publishedAt).getTime();
+          return pub >= Date.now() - days * 24 * 60 * 60 * 1000;
+        });
+        if (items.length === 0) items = trendData.items || [];
       }
 
       setVideos(items.slice(0, 15).map(item => ({
@@ -126,7 +173,7 @@ export default function App() {
     setLoading(false);
   }
 
-  useEffect(() => { fetchVideos(region, tab); }, []);
+  useEffect(() => { fetchVideos(region, tab, period); }, []);
 
   return (
     <div style={{ maxWidth: 680, margin: "0 auto", padding: "20px 16px", fontFamily: "sans-serif", background: "#f9f9f9", minHeight: "100vh" }}>
@@ -135,31 +182,26 @@ export default function App() {
           <h1 style={{ fontSize: 20, fontWeight: 700, margin: 0 }}>YouTube 인기 콘텐츠</h1>
           <p style={{ fontSize: 12, color: "#999", marginTop: 3 }}>{today}</p>
         </div>
-        <button onClick={() => fetchVideos(region, tab)} style={{
+        <button onClick={() => fetchVideos(region, tab, period)} style={{
           background: "#fff", border: "1px solid #ddd", borderRadius: 8,
           padding: "7px 14px", fontSize: 13, cursor: "pointer"
         }}>🔄 새로고침</button>
       </div>
 
-      <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
-        {[["trending", "🔥 트렌딩"], ["shorts", "▶ Shorts"]].map(([id, label]) => (
-          <button key={id} onClick={() => { setTab(id); fetchVideos(region, id); }} style={{
-            background: tab === id ? "#111" : "#fff",
-            color: tab === id ? "#fff" : "#555",
-            border: `1px solid ${tab === id ? "#111" : "#ddd"}`,
-            borderRadius: 99, padding: "6px 16px", fontSize: 13, cursor: "pointer"
-          }}>{label}</button>
+      <div style={{ display: "flex", gap: 8, marginBottom: 10, flexWrap: "wrap" }}>
+        <TabBtn active={tab === "trending"} onClick={() => { setTab("trending"); fetchVideos(region, "trending", period); }}>🔥 트렌딩</TabBtn>
+        <TabBtn active={tab === "shorts"} onClick={() => { setTab("shorts"); fetchVideos(region, "shorts", period); }}>▶ Shorts</TabBtn>
+      </div>
+
+      <div style={{ display: "flex", gap: 8, marginBottom: 10, flexWrap: "wrap" }}>
+        {REGIONS.map(r => (
+          <RegionBtn key={r.code} active={region === r.code} onClick={() => { setRegion(r.code); fetchVideos(r.code, tab, period); }}>{r.label}</RegionBtn>
         ))}
       </div>
 
-      <div style={{ display: "flex", gap: 8, marginBottom: 18 }}>
-        {REGIONS.map(r => (
-          <button key={r.code} onClick={() => { setRegion(r.code); fetchVideos(r.code, tab); }} style={{
-            background: region === r.code ? "#FF0000" : "#fff",
-            color: region === r.code ? "#fff" : "#555",
-            border: `1px solid ${region === r.code ? "#FF0000" : "#ddd"}`,
-            borderRadius: 99, padding: "5px 14px", fontSize: 12, cursor: "pointer"
-          }}>{r.label}</button>
+      <div style={{ display: "flex", gap: 8, marginBottom: 18, flexWrap: "wrap" }}>
+        {PERIODS.map(p => (
+          <PeriodBtn key={p.days} active={period === p.days} onClick={() => { setPeriod(p.days); fetchVideos(region, tab, p.days); }}>{p.label}</PeriodBtn>
         ))}
       </div>
 
@@ -184,6 +226,10 @@ export default function App() {
       {!loading && videos.map((v, i) => (
         <VideoCard key={v.id} video={v} rank={i + 1} />
       ))}
+
+      {!loading && !error && videos.length === 0 && (
+        <div style={{ textAlign: "center", padding: "40px 0", color: "#ccc", fontSize: 14 }}>영상이 없어요</div>
+      )}
     </div>
   );
 }
