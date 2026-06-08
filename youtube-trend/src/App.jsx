@@ -1,15 +1,9 @@
 import { useState, useEffect } from "react";
 
 const REGIONS = [
-  { code: "KR", label: "🇰🇷 한국", lang: "ko" },
-  { code: "US", label: "🇺🇸 미국", lang: "en" },
-  { code: "JP", label: "🇯🇵 일본", lang: "ja" },
-];
-
-const PERIODS = [
-  { label: "오늘", days: 1 },
-  { label: "7일", days: 7 },
-  { label: "30일", days: 30 },
+  { code: "KR", label: "🇰🇷 한국" },
+  { code: "US", label: "🇺🇸 미국" },
+  { code: "JP", label: "🇯🇵 일본" },
 ];
 
 const CATEGORIES = [
@@ -21,6 +15,8 @@ const CATEGORIES = [
   { id: "17", label: "⚽ 스포츠" },
   { id: "22", label: "👤 브이로그" },
 ];
+
+const SHORTS_QUERY = { KR: "쇼츠", US: "shorts", JP: "ショート" };
 
 function timeAgo(dateStr) {
   const diff = (Date.now() - new Date(dateStr)) / 1000;
@@ -83,43 +79,40 @@ export default function App() {
   const [error, setError] = useState("");
   const [region, setRegion] = useState("KR");
   const [tab, setTab] = useState("trending");
-  const [period, setPeriod] = useState(7);
   const [category, setCategory] = useState("0");
 
   const today = new Date().toLocaleDateString("ko-KR", { year: "numeric", month: "long", day: "numeric", weekday: "long" });
 
-  async function fetchVideos(reg, type, days, cat) {
+  async function fetchVideos(reg, type, cat) {
     setLoading(true);
     setError("");
     setVideos([]);
-
-    const lang = REGIONS.find(r => r.code === reg)?.lang || "ko";
-    const publishedAfter = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
-    const duration = type === "shorts" ? "short" : "any";
-
     try {
-      // 검색어 없이 해당 지역+언어+기간+조회수순으로 가져오기
-      let searchUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&regionCode=${reg}&order=viewCount&videoDuration=${duration}&maxResults=20&key=${API_KEY}`;
-      if (cat !== "0") searchUrl += `&videoCategoryId=${cat}`;
+      let items = [];
 
-      const searchRes = await fetch(searchUrl);
-      const searchData = await searchRes.json();
-      if (searchData.error) throw new Error(searchData.error.message);
+      if (type === "shorts") {
+        const q = encodeURIComponent(SHORTS_QUERY[reg] || "shorts");
+        const searchRes = await fetch(
+          `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&videoDuration=short&q=${q}&regionCode=${reg}&order=viewCount&maxResults=20&key=${API_KEY}`
+        );
+        const searchData = await searchRes.json();
+        if (searchData.error) throw new Error(searchData.error.message);
+        const videoIds = (searchData.items || []).map(i => i.id.videoId).filter(Boolean).join(",");
+        if (videoIds) {
+          const statsRes = await fetch(`https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics&id=${videoIds}&key=${API_KEY}`);
+          const statsData = await statsRes.json();
+          items = statsData.items || [];
+        }
+      } else {
+        let url = `https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics&chart=mostPopular&regionCode=${reg}&maxResults=20&key=${API_KEY}`;
+        if (cat !== "0") url += `&videoCategoryId=${cat}`;
+        const res = await fetch(url);
+        const data = await res.json();
+        if (data.error) throw new Error(data.error.message);
+        items = data.items || [];
+      }
 
-      const videoIds = (searchData.items || []).map(i => i.id.videoId).filter(Boolean).join(",");
-      if (!videoIds) { setVideos([]); setLoading(false); return; }
-
-      const statsRes = await fetch(
-        `https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics&id=${videoIds}&key=${API_KEY}`
-      );
-      const statsData = await statsRes.json();
-      if (statsData.error) throw new Error(statsData.error.message);
-
-      const sorted = (statsData.items || []).sort((a, b) =>
-        parseInt(b.statistics?.viewCount || 0) - parseInt(a.statistics?.viewCount || 0)
-      );
-
-      setVideos(sorted.slice(0, 15).map(item => ({
+      setVideos(items.slice(0, 15).map(item => ({
         id: item.id,
         title: item.snippet.title,
         channelTitle: item.snippet.channelTitle,
@@ -136,12 +129,9 @@ export default function App() {
     setLoading(false);
   }
 
-  useEffect(() => { fetchVideos(region, tab, period, category); }, []);
+  useEffect(() => { fetchVideos(region, tab, category); }, []);
 
-  const update = (r, t, d, c) => {
-    setRegion(r); setTab(t); setPeriod(d); setCategory(c);
-    fetchVideos(r, t, d, c);
-  };
+  const update = (r, t, c) => { setRegion(r); setTab(t); setCategory(c); fetchVideos(r, t, c); };
 
   return (
     <div style={{ maxWidth: 680, margin: "0 auto", padding: "20px 16px", fontFamily: "sans-serif", background: "#f9f9f9", minHeight: "100vh" }}>
@@ -150,24 +140,20 @@ export default function App() {
           <h1 style={{ fontSize: 20, fontWeight: 700, margin: 0 }}>YouTube 인기 콘텐츠</h1>
           <p style={{ fontSize: 12, color: "#999", marginTop: 3 }}>{today}</p>
         </div>
-        <button onClick={() => fetchVideos(region, tab, period, category)} style={{ background: "#fff", border: "1px solid #ddd", borderRadius: 8, padding: "7px 14px", fontSize: 13, cursor: "pointer" }}>🔄 새로고침</button>
+        <button onClick={() => fetchVideos(region, tab, category)} style={{ background: "#fff", border: "1px solid #ddd", borderRadius: 8, padding: "7px 14px", fontSize: 13, cursor: "pointer" }}>🔄 새로고침</button>
       </div>
 
       <div style={{ display: "flex", gap: 8, marginBottom: 10, flexWrap: "wrap" }}>
-        <Btn active={tab === "trending"} color="#111" onClick={() => update(region, "trending", period, category)}>🔥 롱폼</Btn>
-        <Btn active={tab === "shorts"} color="#111" onClick={() => update(region, "shorts", period, category)}>▶ Shorts</Btn>
+        <Btn active={tab === "trending"} color="#111" onClick={() => update(region, "trending", category)}>🔥 트렌딩</Btn>
+        <Btn active={tab === "shorts"} color="#111" onClick={() => update(region, "shorts", category)}>▶ Shorts</Btn>
       </div>
 
       <div style={{ display: "flex", gap: 8, marginBottom: 10, flexWrap: "wrap" }}>
-        {REGIONS.map(r => <Btn key={r.code} active={region === r.code} color="#FF0000" onClick={() => update(r.code, tab, period, category)}>{r.label}</Btn>)}
-      </div>
-
-      <div style={{ display: "flex", gap: 8, marginBottom: 10, flexWrap: "wrap" }}>
-        {PERIODS.map(p => <Btn key={p.days} active={period === p.days} color="#4A90E2" onClick={() => update(region, tab, p.days, category)}>{p.label}</Btn>)}
+        {REGIONS.map(r => <Btn key={r.code} active={region === r.code} color="#FF0000" onClick={() => update(r.code, tab, category)}>{r.label}</Btn>)}
       </div>
 
       <div style={{ display: "flex", gap: 8, marginBottom: 18, flexWrap: "wrap" }}>
-        {CATEGORIES.map(c => <Btn key={c.id} active={category === c.id} color="#7B5EA7" onClick={() => update(region, tab, period, c.id)}>{c.label}</Btn>)}
+        {CATEGORIES.map(c => <Btn key={c.id} active={category === c.id} color="#7B5EA7" onClick={() => update(region, tab, c.id)}>{c.label}</Btn>)}
       </div>
 
       {loading && (
