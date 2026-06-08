@@ -122,7 +122,7 @@ export default function App() {
       let items = [];
 
       if (type === "shorts") {
-        const shortsQuery = { KR: "%23Shorts", US: "%23Shorts", JP: "%23Shorts" };
+        const shortsQuery = { KR: "%EC%87%BC%EC%B8%A0", US: "%23Shorts", JP: "%23Shorts+%E6%97%A5%E6%9C%AC%E8%AA%9E" };
         const searchRes = await fetch(
           `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&videoDuration=short&q=${shortsQuery[reg]}&regionCode=${reg}&relevanceLanguage=${lang}&publishedAfter=${publishedAfter}&order=viewCount&maxResults=20&key=${API_KEY}`
         );
