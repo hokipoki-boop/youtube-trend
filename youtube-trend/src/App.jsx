@@ -176,10 +176,11 @@ export default function App() {
       } else {
         const catInfo = CATEGORIES.find(c => c.id === cat);
         if (catInfo?.q) {
-          // 뷰티/시술 등 키워드 검색 카테고리
+          // 뷰티/시술 등 키워드 검색 카테고리 - 7일 이내
+          const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
           const q = encodeURIComponent(catInfo.q[reg] || catInfo.q.KR);
           const searchRes = await fetch(
-            `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&q=${q}&regionCode=${reg}&relevanceLanguage=${lang}&order=viewCount&maxResults=30&key=${API_KEY}`
+            `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&q=${q}&regionCode=${reg}&relevanceLanguage=${lang}&order=viewCount&publishedAfter=${sevenDaysAgo}&maxResults=30&key=${API_KEY}`
           );
           const searchData = await searchRes.json();
           if (searchData.error) throw new Error(searchData.error.message);
