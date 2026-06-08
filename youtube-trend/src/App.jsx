@@ -39,12 +39,20 @@ function formatCount(n) {
 }
 
 function VideoCard({ video, rank }) {
+  const youtubeUrl = video.isShort
+    ? `https://www.youtube.com/shorts/${video.id}`
+    : `https://www.youtube.com/watch?v=${video.id}`;
   return (
+    <a href={youtubeUrl} target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none" }}>
     <div style={{
       display: "flex", gap: 12, alignItems: "flex-start",
       background: "#fff", border: "1px solid #f0f0f0",
       borderRadius: 14, padding: "12px 14px", marginBottom: 10,
-    }}>
+      cursor: "pointer", transition: "box-shadow 0.15s",
+    }}
+    onMouseEnter={e => e.currentTarget.style.boxShadow = "0 2px 12px rgba(0,0,0,0.08)"}
+    onMouseLeave={e => e.currentTarget.style.boxShadow = "none"}
+    >
       <div style={{ fontSize: 18, fontWeight: 700, color: "#ccc", minWidth: 22, textAlign: "center", paddingTop: 2 }}>{rank}</div>
       <div style={{ position: "relative", flexShrink: 0 }}>
         <img src={video.thumbnail} alt={video.title}
@@ -63,6 +71,7 @@ function VideoCard({ video, rank }) {
         </div>
       </div>
     </div>
+    </a>
   );
 }
 
@@ -118,10 +127,12 @@ export default function App() {
           const statsData = await statsRes.json();
           if (statsData.error) throw new Error(statsData.error.message);
 
+          // 언어 필터 강화 - 해당 언어이거나 언어 정보 없는 것만
           const filtered = (statsData.items || []).filter(item => {
-            const audioLang = item.snippet.defaultAudioLanguage || "";
-            const defLang = item.snippet.defaultLanguage || "";
-            return !audioLang || audioLang.startsWith(lang) || defLang.startsWith(lang);
+            const audioLang = (item.snippet.defaultAudioLanguage || "").toLowerCase();
+            const defLang = (item.snippet.defaultLanguage || "").toLowerCase();
+            if (!audioLang && !defLang) return true;
+            return audioLang.startsWith(lang) || defLang.startsWith(lang);
           });
           items = filtered.length >= 5 ? filtered : statsData.items || [];
         }
