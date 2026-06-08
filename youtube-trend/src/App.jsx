@@ -22,9 +22,6 @@ const CATEGORIES = [
   { id: "22", label: "👤 브이로그" },
 ];
 
-const SHORTS_QUERY = { KR: "쇼츠", US: "shorts", JP: "ショート" };
-const LONG_QUERY   = { KR: "인기 영상", US: "popular video", JP: "人気動画" };
-
 function timeAgo(dateStr) {
   const diff = (Date.now() - new Date(dateStr)) / 1000;
   if (diff < 3600) return `${Math.floor(diff / 60)}분 전`;
@@ -98,12 +95,11 @@ export default function App() {
 
     const lang = REGIONS.find(r => r.code === reg)?.lang || "ko";
     const publishedAfter = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
-    const q = encodeURIComponent(type === "shorts" ? SHORTS_QUERY[reg] : LONG_QUERY[reg]);
-    const duration = type === "shorts" ? "short" : "medium";
+    const duration = type === "shorts" ? "short" : "any";
 
     try {
-      // 검색 API로 기간 필터 적용
-      let searchUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&q=${q}&regionCode=${reg}&relevanceLanguage=${lang}&publishedAfter=${publishedAfter}&order=viewCount&videoDuration=${duration}&maxResults=20&key=${API_KEY}`;
+      // 검색어 없이 해당 지역+언어+기간+조회수순으로 가져오기
+      let searchUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&regionCode=${reg}&relevanceLanguage=${lang}&publishedAfter=${publishedAfter}&order=viewCount&videoDuration=${duration}&maxResults=20&key=${API_KEY}`;
       if (cat !== "0") searchUrl += `&videoCategoryId=${cat}`;
 
       const searchRes = await fetch(searchUrl);
@@ -119,7 +115,6 @@ export default function App() {
       const statsData = await statsRes.json();
       if (statsData.error) throw new Error(statsData.error.message);
 
-      // 조회수 내림차순 정렬
       const sorted = (statsData.items || []).sort((a, b) =>
         parseInt(b.statistics?.viewCount || 0) - parseInt(a.statistics?.viewCount || 0)
       );
