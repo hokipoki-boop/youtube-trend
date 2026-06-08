@@ -127,11 +127,10 @@ export default function App() {
             const statsRes = await fetch(`https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics&id=${videoIds}&key=${API_KEY}`);
             const statsData = await statsRes.json();
             if (statsData.error) throw new Error(statsData.error.message);
-            // 한글 제목만 필터
-            const filtered = (statsData.items || []).filter(item =>
-              /[ㄱ-ㅎㅏ-ㅣ가-힣]/.test(item.snippet.title)
+            // 한글 제목만 엄격하게 필터 (fallback 없음)
+            items = (statsData.items || []).filter(item =>
+              /[가-힣]/.test(item.snippet.title)
             );
-            items = filtered.length >= 5 ? filtered : statsData.items || [];
           }
         } else {
           // 미국/일본은 트렌딩 API + 60초 이하 필터
