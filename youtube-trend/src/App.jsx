@@ -132,19 +132,39 @@ export default function App() {
               /[가-힣]/.test(item.snippet.title)
             );
           }
-        } else {
-          // 미국/일본은 트렌딩 API + 60초 이하 필터
-          const trendRes = await fetch(
-            `https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics,contentDetails&chart=mostPopular&regionCode=${reg}&maxResults=50&key=${API_KEY}`
+        } else if (reg === "US") {
+          const searchRes = await fetch(
+            `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&videoDuration=short&q=shorts&regionCode=US&relevanceLanguage=en&order=viewCount&publishedAfter=${sevenDaysAgo}&maxResults=30&key=${API_KEY}`
           );
-          const trendData = await trendRes.json();
-          if (trendData.error) throw new Error(trendData.error.message);
-          items = (trendData.items || []).filter(item => {
-            const d = item.contentDetails?.duration || "";
-            const match = d.match(/PT(?:(\d+)M)?(?:(\d+)S)?/);
-            const secs = (parseInt(match?.[1] || 0) * 60) + parseInt(match?.[2] || 0);
-            return secs > 0 && secs <= 60;
-          });
+          const searchData = await searchRes.json();
+          if (searchData.error) throw new Error(searchData.error.message);
+          const videoIds = (searchData.items || []).map(i => i.id.videoId).filter(Boolean).join(",");
+          if (videoIds) {
+            const statsRes = await fetch(`https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics&id=${videoIds}&key=${API_KEY}`);
+            const statsData = await statsRes.json();
+            if (statsData.error) throw new Error(statsData.error.message);
+            const filtered = (statsData.items || []).filter(item =>
+              !/[가-힣\u3040-\u30ff\u4e00-\u9fff\u0600-\u06ff\u0900-\u097f]/.test(item.snippet.title)
+            );
+            items = filtered.length >= 3 ? filtered : statsData.items || [];
+          }
+        } else {
+          // 일본 검색 API
+          const searchRes = await fetch(
+            `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&videoDuration=short&q=%E3%82%B7%E3%83%A7%E3%83%BC%E3%83%88&regionCode=JP&relevanceLanguage=ja&order=viewCount&publishedAfter=${sevenDaysAgo}&maxResults=30&key=${API_KEY}`
+          );
+          const searchData = await searchRes.json();
+          if (searchData.error) throw new Error(searchData.error.message);
+          const videoIds = (searchData.items || []).map(i => i.id.videoId).filter(Boolean).join(",");
+          if (videoIds) {
+            const statsRes = await fetch(`https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics&id=${videoIds}&key=${API_KEY}`);
+            const statsData = await statsRes.json();
+            if (statsData.error) throw new Error(statsData.error.message);
+            const filtered = (statsData.items || []).filter(item =>
+              /[\u3040-\u30ff\u4e00-\u9fff]/.test(item.snippet.title)
+            );
+            items = filtered.length >= 3 ? filtered : statsData.items || [];
+          }
         }
       } else {
         let url = `https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics&chart=mostPopular&regionCode=${reg}&maxResults=50&key=${API_KEY}`;
