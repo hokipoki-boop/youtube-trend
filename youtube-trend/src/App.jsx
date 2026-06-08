@@ -115,10 +115,10 @@ export default function App() {
       let items = [];
 
       if (type === "shorts") {
+        const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
         if (reg === "KR") {
-          const publishedAfter = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
           const searchRes = await fetch(
-            `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&videoDuration=short&q=%EC%87%BC%EC%B8%A0&regionCode=KR&relevanceLanguage=ko&order=viewCount&publishedAfter=${publishedAfter}&maxResults=30&key=${API_KEY}`
+            `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&videoDuration=short&q=%EC%87%BC%EC%B8%A0&regionCode=KR&relevanceLanguage=ko&order=viewCount&publishedAfter=${sevenDaysAgo}&maxResults=30&key=${API_KEY}`
           );
           const searchData = await searchRes.json();
           if (searchData.error) throw new Error(searchData.error.message);
@@ -207,10 +207,6 @@ export default function App() {
       </div>
 
       <div style={{ display: "flex", gap: 8, marginBottom: 10, flexWrap: "wrap" }}>
-        {tab === "shorts" && PERIODS.map(p => <Btn key={p.days} active={period === p.days} color="#4A90E2" onClick={() => update(region, tab, category, p.days)}>{p.label}</Btn>)}
-      </div>
-
-      <div style={{ display: "flex", gap: 8, marginBottom: 18, flexWrap: "wrap" }}>
         {SORTS.map(s => <Btn key={s.id} active={sort === s.id} color="#E67E22" onClick={() => { setSort(s.id); setShowCount(15); }}>{s.label}</Btn>)}
       </div>
 
