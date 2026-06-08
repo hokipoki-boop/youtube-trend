@@ -7,13 +7,16 @@ const REGIONS = [
 ];
 
 const CATEGORIES = [
-  { id: "0",  label: "🔥 전체" },
-  { id: "10", label: "🎵 음악" },
-  { id: "23", label: "😂 코미디" },
-  { id: "24", label: "🎮 게임" },
-  { id: "25", label: "📰 뉴스" },
-  { id: "17", label: "⚽ 스포츠" },
-  { id: "22", label: "👤 브이로그" },
+  { id: "0",  label: "🔥 전체", q: null },
+  { id: "10", label: "🎵 음악", q: null },
+  { id: "23", label: "😂 코미디", q: null },
+  { id: "24", label: "🎮 게임", q: null },
+  { id: "25", label: "📰 뉴스", q: null },
+  { id: "17", label: "⚽ 스포츠", q: null },
+  { id: "22", label: "👤 브이로그", q: null },
+  { id: "beauty", label: "💄 뷰티", q: { KR: "뷰티 메이크업", US: "beauty makeup", JP: "メイク 美容" } },
+  { id: "skincare", label: "🧴 피부관리", q: { KR: "피부관리 스킨케어", US: "skincare routine", JP: "スキンケア 美肌" } },
+  { id: "procedure", label: "💉 시술", q: { KR: "피부시술 보톡스 필러", US: "botox filler procedure", JP: "美容整形 施術" } },
 ];
 
 const SORTS = [
@@ -116,9 +119,13 @@ export default function App() {
 
       if (type === "shorts") {
         const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+        const catInfo = CATEGORIES.find(c => c.id === cat);
+        const krQ = catInfo?.q ? encodeURIComponent(catInfo.q.KR) : "%EC%87%BC%EC%B8%A0";
+        const usQ = catInfo?.q ? encodeURIComponent(catInfo.q.US) : "shorts";
+        const jpQ = catInfo?.q ? encodeURIComponent(catInfo.q.JP) : "%E3%82%B7%E3%83%A7%E3%83%BC%E3%83%88";
         if (reg === "KR") {
           const searchRes = await fetch(
-            `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&videoDuration=short&q=%EC%87%BC%EC%B8%A0&regionCode=KR&relevanceLanguage=ko&order=viewCount&publishedAfter=${sevenDaysAgo}&maxResults=30&key=${API_KEY}`
+            `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&videoDuration=short&q=${krQ}&regionCode=KR&relevanceLanguage=ko&order=viewCount&publishedAfter=${sevenDaysAgo}&maxResults=30&key=${API_KEY}`
           );
           const searchData = await searchRes.json();
           if (searchData.error) throw new Error(searchData.error.message);
@@ -134,7 +141,7 @@ export default function App() {
           }
         } else if (reg === "US") {
           const searchRes = await fetch(
-            `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&videoDuration=short&q=shorts&regionCode=US&relevanceLanguage=en&order=viewCount&publishedAfter=${sevenDaysAgo}&maxResults=30&key=${API_KEY}`
+            `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&videoDuration=short&q=${usQ}&regionCode=US&relevanceLanguage=en&order=viewCount&publishedAfter=${sevenDaysAgo}&maxResults=30&key=${API_KEY}`
           );
           const searchData = await searchRes.json();
           if (searchData.error) throw new Error(searchData.error.message);
@@ -151,7 +158,7 @@ export default function App() {
         } else {
           // 일본 검색 API
           const searchRes = await fetch(
-            `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&videoDuration=short&q=%E3%82%B7%E3%83%A7%E3%83%BC%E3%83%88&regionCode=JP&relevanceLanguage=ja&order=viewCount&publishedAfter=${sevenDaysAgo}&maxResults=30&key=${API_KEY}`
+            `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&videoDuration=short&q=${jpQ}&regionCode=JP&relevanceLanguage=ja&order=viewCount&publishedAfter=${sevenDaysAgo}&maxResults=30&key=${API_KEY}`
           );
           const searchData = await searchRes.json();
           if (searchData.error) throw new Error(searchData.error.message);
@@ -167,12 +174,30 @@ export default function App() {
           }
         }
       } else {
-        let url = `https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics&chart=mostPopular&regionCode=${reg}&maxResults=50&key=${API_KEY}`;
-        if (cat !== "0") url += `&videoCategoryId=${cat}`;
-        const res = await fetch(url);
-        const data = await res.json();
-        if (data.error) throw new Error(data.error.message);
-        items = data.items || [];
+        const catInfo = CATEGORIES.find(c => c.id === cat);
+        if (catInfo?.q) {
+          // 뷰티/시술 등 키워드 검색 카테고리
+          const q = encodeURIComponent(catInfo.q[reg] || catInfo.q.KR);
+          const searchRes = await fetch(
+            `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&q=${q}&regionCode=${reg}&relevanceLanguage=${lang}&order=viewCount&maxResults=30&key=${API_KEY}`
+          );
+          const searchData = await searchRes.json();
+          if (searchData.error) throw new Error(searchData.error.message);
+          const videoIds = (searchData.items || []).map(i => i.id.videoId).filter(Boolean).join(",");
+          if (videoIds) {
+            const statsRes = await fetch(`https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics&id=${videoIds}&key=${API_KEY}`);
+            const statsData = await statsRes.json();
+            if (statsData.error) throw new Error(statsData.error.message);
+            items = statsData.items || [];
+          }
+        } else {
+          let url = `https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics&chart=mostPopular&regionCode=${reg}&maxResults=50&key=${API_KEY}`;
+          if (cat !== "0") url += `&videoCategoryId=${cat}`;
+          const res = await fetch(url);
+          const data = await res.json();
+          if (data.error) throw new Error(data.error.message);
+          items = data.items || [];
+        }
       }
 
       setAllVideos(items.map(item => ({
