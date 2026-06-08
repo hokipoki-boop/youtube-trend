@@ -22,6 +22,12 @@ const SORTS = [
   { id: "likeCount", label: "❤️ 좋아요순" },
 ];
 
+const PERIODS = [
+  { label: "7일", days: 7 },
+  { label: "30일", days: 30 },
+  { label: "90일", days: 90 },
+];
+
 function timeAgo(dateStr) {
   const diff = (Date.now() - new Date(dateStr)) / 1000;
   if (diff < 3600) return `${Math.floor(diff / 60)}분 전`;
@@ -91,10 +97,11 @@ export default function App() {
   const [tab, setTab] = useState("trending");
   const [category, setCategory] = useState("0");
   const [sort, setSort] = useState("default");
+  const [period, setPeriod] = useState(30);
 
   const today = new Date().toLocaleDateString("ko-KR", { year: "numeric", month: "long", day: "numeric", weekday: "long" });
 
-  async function fetchVideos(reg, type, cat) {
+  async function fetchVideos(reg, type, cat, days) {
     setLoading(true);
     setError("");
     setAllVideos([]);
@@ -109,9 +116,9 @@ export default function App() {
 
       if (type === "shorts") {
         if (reg === "KR") {
-          // 한국은 검색 API + 한국어 제목 필터
+          const publishedAfter = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
           const searchRes = await fetch(
-            `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&videoDuration=short&q=%EC%87%BC%EC%B8%A0&regionCode=KR&relevanceLanguage=ko&order=viewCount&maxResults=30&key=${API_KEY}`
+            `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&videoDuration=short&q=%EC%87%BC%EC%B8%A0&regionCode=KR&relevanceLanguage=ko&order=viewCount&publishedAfter=${publishedAfter}&maxResults=30&key=${API_KEY}`
           );
           const searchData = await searchRes.json();
           if (searchData.error) throw new Error(searchData.error.message);
@@ -166,9 +173,9 @@ export default function App() {
     setLoading(false);
   }
 
-  useEffect(() => { fetchVideos(region, tab, category); }, []);
+  useEffect(() => { fetchVideos(region, tab, category, period); }, []);
 
-  const update = (r, t, c) => { setRegion(r); setTab(t); setCategory(c); fetchVideos(r, t, c); };
+  const update = (r, t, c, d) => { setRegion(r); setTab(t); setCategory(c); setPeriod(d); fetchVideos(r, t, c, d); };
 
   const sortedVideos = [...allVideos].sort((a, b) => {
     if (sort === "viewCount") return parseInt(b.viewCount || 0) - parseInt(a.viewCount || 0);
@@ -184,20 +191,24 @@ export default function App() {
           <h1 style={{ fontSize: 20, fontWeight: 700, margin: 0 }}>YouTube 인기 콘텐츠</h1>
           <p style={{ fontSize: 12, color: "#999", marginTop: 3 }}>{today}</p>
         </div>
-        <button onClick={() => fetchVideos(region, tab, category)} style={{ background: "#fff", border: "1px solid #ddd", borderRadius: 8, padding: "7px 14px", fontSize: 13, cursor: "pointer" }}>🔄 새로고침</button>
+        <button onClick={() => fetchVideos(region, tab, category, period)} style={{ background: "#fff", border: "1px solid #ddd", borderRadius: 8, padding: "7px 14px", fontSize: 13, cursor: "pointer" }}>🔄 새로고침</button>
       </div>
 
       <div style={{ display: "flex", gap: 8, marginBottom: 10, flexWrap: "wrap" }}>
-        <Btn active={tab === "trending"} color="#111" onClick={() => update(region, "trending", category)}>🔥 트렌딩</Btn>
-        <Btn active={tab === "shorts"} color="#111" onClick={() => update(region, "shorts", category)}>▶ Shorts</Btn>
+        <Btn active={tab === "trending"} color="#111" onClick={() => update(region, "trending", category, period)}>🔥 트렌딩</Btn>
+        <Btn active={tab === "shorts"} color="#111" onClick={() => update(region, "shorts", category, period)}>▶ Shorts</Btn>
       </div>
 
       <div style={{ display: "flex", gap: 8, marginBottom: 10, flexWrap: "wrap" }}>
-        {REGIONS.map(r => <Btn key={r.code} active={region === r.code} color="#FF0000" onClick={() => update(r.code, tab, category)}>{r.label}</Btn>)}
+        {REGIONS.map(r => <Btn key={r.code} active={region === r.code} color="#FF0000" onClick={() => update(r.code, tab, category, period)}>{r.label}</Btn>)}
       </div>
 
       <div style={{ display: "flex", gap: 8, marginBottom: 10, flexWrap: "wrap" }}>
-        {CATEGORIES.map(c => <Btn key={c.id} active={category === c.id} color="#7B5EA7" onClick={() => update(region, tab, c.id)}>{c.label}</Btn>)}
+        {CATEGORIES.map(c => <Btn key={c.id} active={category === c.id} color="#7B5EA7" onClick={() => update(region, tab, c.id, period)}>{c.label}</Btn>)}
+      </div>
+
+      <div style={{ display: "flex", gap: 8, marginBottom: 10, flexWrap: "wrap" }}>
+        {tab === "shorts" && PERIODS.map(p => <Btn key={p.days} active={period === p.days} color="#4A90E2" onClick={() => update(region, tab, category, p.days)}>{p.label}</Btn>)}
       </div>
 
       <div style={{ display: "flex", gap: 8, marginBottom: 18, flexWrap: "wrap" }}>
