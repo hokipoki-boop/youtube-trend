@@ -103,8 +103,9 @@ export default function App() {
       let items = [];
 
       if (type === "shorts") {
+        const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
         const searchRes = await fetch(
-          `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&videoDuration=short&q=${shortsQ}&regionCode=${reg}&relevanceLanguage=${lang}&order=viewCount&maxResults=30&key=${API_KEY}`
+          `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&videoDuration=short&q=${shortsQ}&regionCode=${reg}&relevanceLanguage=${lang}&order=viewCount&publishedAfter=${thirtyDaysAgo}&maxResults=30&key=${API_KEY}`
         );
         const searchData = await searchRes.json();
         if (searchData.error) throw new Error(searchData.error.message);
