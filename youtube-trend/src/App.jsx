@@ -108,26 +108,37 @@ export default function App() {
       let items = [];
 
       if (type === "shorts") {
-        const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
-        const searchRes = await fetch(
-          `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&videoDuration=short&q=${shortsQ}&regionCode=${reg}&relevanceLanguage=${lang}&order=viewCount&publishedAfter=${thirtyDaysAgo}&maxResults=30&key=${API_KEY}`
-        );
-        const searchData = await searchRes.json();
-        if (searchData.error) throw new Error(searchData.error.message);
-
-        const videoIds = (searchData.items || []).map(i => i.id.videoId).filter(Boolean).join(",");
-        if (videoIds) {
-          const statsRes = await fetch(`https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics&id=${videoIds}&key=${API_KEY}`);
-          const statsData = await statsRes.json();
-          if (statsData.error) throw new Error(statsData.error.message);
-
-          const filtered = (statsData.items || []).filter(item => {
-            const audioLang = (item.snippet.defaultAudioLanguage || "").toLowerCase();
-            const defLang = (item.snippet.defaultLanguage || "").toLowerCase();
-            if (!audioLang && !defLang) return true;
-            return audioLang.startsWith(lang) || defLang.startsWith(lang);
+        if (reg === "KR") {
+          // 한국은 검색 API + 한국어 제목 필터
+          const searchRes = await fetch(
+            `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&videoDuration=short&q=%EC%87%BC%EC%B8%A0&regionCode=KR&relevanceLanguage=ko&order=viewCount&maxResults=30&key=${API_KEY}`
+          );
+          const searchData = await searchRes.json();
+          if (searchData.error) throw new Error(searchData.error.message);
+          const videoIds = (searchData.items || []).map(i => i.id.videoId).filter(Boolean).join(",");
+          if (videoIds) {
+            const statsRes = await fetch(`https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics&id=${videoIds}&key=${API_KEY}`);
+            const statsData = await statsRes.json();
+            if (statsData.error) throw new Error(statsData.error.message);
+            // 한글 제목만 필터
+            const filtered = (statsData.items || []).filter(item =>
+              /[ㄱ-ㅎㅏ-ㅣ가-힣]/.test(item.snippet.title)
+            );
+            items = filtered.length >= 5 ? filtered : statsData.items || [];
+          }
+        } else {
+          // 미국/일본은 트렌딩 API + 60초 이하 필터
+          const trendRes = await fetch(
+            `https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics,contentDetails&chart=mostPopular&regionCode=${reg}&maxResults=50&key=${API_KEY}`
+          );
+          const trendData = await trendRes.json();
+          if (trendData.error) throw new Error(trendData.error.message);
+          items = (trendData.items || []).filter(item => {
+            const d = item.contentDetails?.duration || "";
+            const match = d.match(/PT(?:(\d+)M)?(?:(\d+)S)?/);
+            const secs = (parseInt(match?.[1] || 0) * 60) + parseInt(match?.[2] || 0);
+            return secs > 0 && secs <= 60;
           });
-          items = filtered.length >= 5 ? filtered : statsData.items || [];
         }
       } else {
         let url = `https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics&chart=mostPopular&regionCode=${reg}&maxResults=50&key=${API_KEY}`;
