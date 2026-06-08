@@ -6,6 +6,12 @@ const REGIONS = [
   { code: "JP", label: "🇯🇵 일본", lang: "ja", shortsQ: "ショート" },
 ];
 
+const SORTS = [
+  { id: "default", label: "🎯 YouTube 추천순" },
+  { id: "viewCount", label: "👁 조회수순" },
+  { id: "likeCount", label: "❤️ 좋아요순" },
+];
+
 const CATEGORIES = [
   { id: "0",  label: "🔥 전체" },
   { id: "10", label: "🎵 음악" },
@@ -72,19 +78,22 @@ function Btn({ active, onClick, children, color = "#111" }) {
 
 export default function App() {
   const API_KEY = process.env.REACT_APP_YOUTUBE_API_KEY;
-  const [videos, setVideos] = useState([]);
+  const [allVideos, setAllVideos] = useState([]);
+  const [showCount, setShowCount] = useState(15);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [region, setRegion] = useState("KR");
   const [tab, setTab] = useState("trending");
   const [category, setCategory] = useState("0");
+  const [sort, setSort] = useState("default");
 
   const today = new Date().toLocaleDateString("ko-KR", { year: "numeric", month: "long", day: "numeric", weekday: "long" });
 
   async function fetchVideos(reg, type, cat) {
     setLoading(true);
     setError("");
-    setVideos([]);
+    setAllVideos([]);
+    setShowCount(15);
 
     const regionInfo = REGIONS.find(r => r.code === reg);
     const lang = regionInfo?.lang || "ko";
@@ -94,7 +103,6 @@ export default function App() {
       let items = [];
 
       if (type === "shorts") {
-        // 지역별 언어로 검색 + 해당 언어 영상만 필터
         const searchRes = await fetch(
           `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&videoDuration=short&q=${shortsQ}&regionCode=${reg}&relevanceLanguage=${lang}&order=viewCount&maxResults=30&key=${API_KEY}`
         );
@@ -109,19 +117,15 @@ export default function App() {
           const statsData = await statsRes.json();
           if (statsData.error) throw new Error(statsData.error.message);
 
-          // 해당 언어 영상만 필터링
-          items = (statsData.items || []).filter(item => {
+          const filtered = (statsData.items || []).filter(item => {
             const audioLang = item.snippet.defaultAudioLanguage || "";
             const defLang = item.snippet.defaultLanguage || "";
-            // 언어 정보가 없으면 포함, 있으면 해당 언어만
             return !audioLang || audioLang.startsWith(lang) || defLang.startsWith(lang);
           });
-
-          // 필터 후 너무 적으면 필터 없이 전체 사용
-          if (items.length < 5) items = statsData.items || [];
+          items = filtered.length >= 5 ? filtered : statsData.items || [];
         }
       } else {
-        let url = `https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics&chart=mostPopular&regionCode=${reg}&maxResults=20&key=${API_KEY}`;
+        let url = `https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics&chart=mostPopular&regionCode=${reg}&maxResults=50&key=${API_KEY}`;
         if (cat !== "0") url += `&videoCategoryId=${cat}`;
         const res = await fetch(url);
         const data = await res.json();
@@ -129,7 +133,8 @@ export default function App() {
         items = data.items || [];
       }
 
-      setVideos(items.slice(0, 15).map(item => ({
+      // 기본은 YouTube 추천순 유지 (정렬 안 함)
+      setAllVideos(items.map(item => ({
         id: item.id,
         title: item.snippet.title,
         channelTitle: item.snippet.channelTitle,
@@ -149,6 +154,13 @@ export default function App() {
   useEffect(() => { fetchVideos(region, tab, category); }, []);
 
   const update = (r, t, c) => { setRegion(r); setTab(t); setCategory(c); fetchVideos(r, t, c); };
+
+  const sortedVideos = [...allVideos].sort((a, b) => {
+    if (sort === "viewCount") return parseInt(b.viewCount || 0) - parseInt(a.viewCount || 0);
+    if (sort === "likeCount") return parseInt(b.likeCount || 0) - parseInt(a.likeCount || 0);
+    return 0; // default: YouTube 추천순
+  });
+  const videos = sortedVideos.slice(0, showCount);
 
   return (
     <div style={{ maxWidth: 680, margin: "0 auto", padding: "20px 16px", fontFamily: "sans-serif", background: "#f9f9f9", minHeight: "100vh" }}>
@@ -173,6 +185,10 @@ export default function App() {
         {CATEGORIES.map(c => <Btn key={c.id} active={category === c.id} color="#7B5EA7" onClick={() => update(region, tab, c.id)}>{c.label}</Btn>)}
       </div>
 
+      <div style={{ display: "flex", gap: 8, marginBottom: 18, flexWrap: "wrap" }}>
+        {SORTS.map(s => <Btn key={s.id} active={sort === s.id} color="#E67E22" onClick={() => { setSort(s.id); setShowCount(15); }}>{s.label}</Btn>)}
+      </div>
+
       {loading && (
         <div style={{ textAlign: "center", padding: "40px 0", color: "#999" }}>
           <div style={{ display: "inline-block", width: 22, height: 22, border: "2px solid #eee", borderTopColor: "#FF0000", borderRadius: "50%", animation: "spin 0.7s linear infinite", marginBottom: 10 }} />
@@ -189,7 +205,16 @@ export default function App() {
 
       {!loading && videos.map((v, i) => <VideoCard key={v.id} video={v} rank={i + 1} />)}
 
-      {!loading && !error && videos.length === 0 && (
+      {!loading && showCount < sortedVideos.length && (
+        <button onClick={() => setShowCount(c => c + 15)} style={{
+          width: "100%", background: "#fff", border: "1px solid #ddd",
+          borderRadius: 10, padding: "12px", fontSize: 14, cursor: "pointer", color: "#555", marginTop: 4
+        }}>
+          더 보기 ({sortedVideos.length - showCount}개 남음)
+        </button>
+      )}
+
+      {!loading && !error && allVideos.length === 0 && (
         <div style={{ textAlign: "center", padding: "40px 0", color: "#ccc", fontSize: 14 }}>영상이 없어요</div>
       )}
     </div>
