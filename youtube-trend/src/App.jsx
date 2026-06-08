@@ -6,12 +6,6 @@ const REGIONS = [
   { code: "JP", label: "🇯🇵 일본", lang: "ja", shortsQ: "ショート" },
 ];
 
-const SORTS = [
-  { id: "default", label: "🎯 YouTube 추천순" },
-  { id: "viewCount", label: "👁 조회수순" },
-  { id: "likeCount", label: "❤️ 좋아요순" },
-];
-
 const CATEGORIES = [
   { id: "0",  label: "🔥 전체" },
   { id: "10", label: "🎵 음악" },
@@ -20,6 +14,12 @@ const CATEGORIES = [
   { id: "25", label: "📰 뉴스" },
   { id: "17", label: "⚽ 스포츠" },
   { id: "22", label: "👤 브이로그" },
+];
+
+const SORTS = [
+  { id: "default", label: "🎯 YouTube 추천순" },
+  { id: "viewCount", label: "👁 조회수순" },
+  { id: "likeCount", label: "❤️ 좋아요순" },
 ];
 
 function timeAgo(dateStr) {
@@ -39,38 +39,34 @@ function formatCount(n) {
 }
 
 function VideoCard({ video, rank }) {
-  const youtubeUrl = video.isShort
+  const url = video.isShort
     ? `https://www.youtube.com/shorts/${video.id}`
     : `https://www.youtube.com/watch?v=${video.id}`;
+
   return (
-    <a href={youtubeUrl} target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none" }}>
-    <div style={{
-      display: "flex", gap: 12, alignItems: "flex-start",
-      background: "#fff", border: "1px solid #f0f0f0",
-      borderRadius: 14, padding: "12px 14px", marginBottom: 10,
-      cursor: "pointer", transition: "box-shadow 0.15s",
-    }}
-    onMouseEnter={e => e.currentTarget.style.boxShadow = "0 2px 12px rgba(0,0,0,0.08)"}
-    onMouseLeave={e => e.currentTarget.style.boxShadow = "none"}
-    >
-      <div style={{ fontSize: 18, fontWeight: 700, color: "#ccc", minWidth: 22, textAlign: "center", paddingTop: 2 }}>{rank}</div>
-      <div style={{ position: "relative", flexShrink: 0 }}>
-        <img src={video.thumbnail} alt={video.title}
-          style={{ width: 100, height: 56, borderRadius: 8, objectFit: "cover", display: "block" }} />
-        {video.isShort && (
-          <span style={{ position: "absolute", bottom: 4, left: 4, background: "#FF0000", color: "#fff", fontSize: 9, fontWeight: 700, padding: "1px 5px", borderRadius: 4 }}>Shorts</span>
-        )}
-      </div>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 13, fontWeight: 600, color: "#111", marginBottom: 3, lineHeight: 1.4, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>{video.title}</div>
-        <div style={{ fontSize: 11, color: "#999", marginBottom: 6 }}>{video.channelTitle} · {timeAgo(video.publishedAt)}</div>
-        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-          <span style={{ background: "#f5f5f5", borderRadius: 99, padding: "2px 9px", fontSize: 11, color: "#666" }}>👁 {formatCount(video.viewCount)}</span>
-          <span style={{ background: "#f5f5f5", borderRadius: 99, padding: "2px 9px", fontSize: 11, color: "#666" }}>❤️ {formatCount(video.likeCount)}</span>
-          <span style={{ background: "#f5f5f5", borderRadius: 99, padding: "2px 9px", fontSize: 11, color: "#666" }}>💬 {formatCount(video.commentCount)}</span>
+    <a href={url} target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none", display: "block", marginBottom: 10 }}>
+      <div
+        style={{ display: "flex", gap: 12, alignItems: "flex-start", background: "#fff", border: "1px solid #f0f0f0", borderRadius: 14, padding: "12px 14px", cursor: "pointer" }}
+        onMouseEnter={e => e.currentTarget.style.boxShadow = "0 2px 12px rgba(0,0,0,0.08)"}
+        onMouseLeave={e => e.currentTarget.style.boxShadow = "none"}
+      >
+        <div style={{ fontSize: 18, fontWeight: 700, color: "#ccc", minWidth: 22, textAlign: "center", paddingTop: 2 }}>{rank}</div>
+        <div style={{ position: "relative", flexShrink: 0 }}>
+          <img src={video.thumbnail} alt={video.title} style={{ width: 100, height: 56, borderRadius: 8, objectFit: "cover", display: "block" }} />
+          {video.isShort && (
+            <span style={{ position: "absolute", bottom: 4, left: 4, background: "#FF0000", color: "#fff", fontSize: 9, fontWeight: 700, padding: "1px 5px", borderRadius: 4 }}>Shorts</span>
+          )}
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: "#111", marginBottom: 3, lineHeight: 1.4, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>{video.title}</div>
+          <div style={{ fontSize: 11, color: "#999", marginBottom: 6 }}>{video.channelTitle} · {timeAgo(video.publishedAt)}</div>
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+            <span style={{ background: "#f5f5f5", borderRadius: 99, padding: "2px 9px", fontSize: 11, color: "#666" }}>👁 {formatCount(video.viewCount)}</span>
+            <span style={{ background: "#f5f5f5", borderRadius: 99, padding: "2px 9px", fontSize: 11, color: "#666" }}>❤️ {formatCount(video.likeCount)}</span>
+            <span style={{ background: "#f5f5f5", borderRadius: 99, padding: "2px 9px", fontSize: 11, color: "#666" }}>💬 {formatCount(video.commentCount)}</span>
+          </div>
         </div>
       </div>
-    </div>
     </a>
   );
 }
@@ -121,13 +117,10 @@ export default function App() {
 
         const videoIds = (searchData.items || []).map(i => i.id.videoId).filter(Boolean).join(",");
         if (videoIds) {
-          const statsRes = await fetch(
-            `https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics&id=${videoIds}&key=${API_KEY}`
-          );
+          const statsRes = await fetch(`https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics&id=${videoIds}&key=${API_KEY}`);
           const statsData = await statsRes.json();
           if (statsData.error) throw new Error(statsData.error.message);
 
-          // 언어 필터 강화 - 해당 언어이거나 언어 정보 없는 것만
           const filtered = (statsData.items || []).filter(item => {
             const audioLang = (item.snippet.defaultAudioLanguage || "").toLowerCase();
             const defLang = (item.snippet.defaultLanguage || "").toLowerCase();
@@ -145,7 +138,6 @@ export default function App() {
         items = data.items || [];
       }
 
-      // 기본은 YouTube 추천순 유지 (정렬 안 함)
       setAllVideos(items.map(item => ({
         id: item.id,
         title: item.snippet.title,
@@ -170,7 +162,7 @@ export default function App() {
   const sortedVideos = [...allVideos].sort((a, b) => {
     if (sort === "viewCount") return parseInt(b.viewCount || 0) - parseInt(a.viewCount || 0);
     if (sort === "likeCount") return parseInt(b.likeCount || 0) - parseInt(a.likeCount || 0);
-    return 0; // default: YouTube 추천순
+    return 0;
   });
   const videos = sortedVideos.slice(0, showCount);
 
@@ -193,7 +185,7 @@ export default function App() {
         {REGIONS.map(r => <Btn key={r.code} active={region === r.code} color="#FF0000" onClick={() => update(r.code, tab, category)}>{r.label}</Btn>)}
       </div>
 
-      <div style={{ display: "flex", gap: 8, marginBottom: 18, flexWrap: "wrap" }}>
+      <div style={{ display: "flex", gap: 8, marginBottom: 10, flexWrap: "wrap" }}>
         {CATEGORIES.map(c => <Btn key={c.id} active={category === c.id} color="#7B5EA7" onClick={() => update(region, tab, c.id)}>{c.label}</Btn>)}
       </div>
 
