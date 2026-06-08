@@ -12,6 +12,23 @@ const PERIODS = [
   { label: "30일", days: 30 },
 ];
 
+// YouTube 카테고리 ID
+const CATEGORIES = [
+  { id: "0",  label: "🔥 전체" },
+  { id: "10", label: "🎵 음악" },
+  { id: "23", label: "😂 코미디" },
+  { id: "24", label: "🎮 게임" },
+  { id: "25", label: "📰 뉴스" },
+  { id: "17", label: "⚽ 스포츠" },
+  { id: "22", label: "👤 브이로그" },
+];
+
+const SHORTS_QUERY = {
+  KR: "쇼츠+인기",
+  US: "%23Shorts+trending",
+  JP: "ショート動画+人気",
+};
+
 function timeAgo(dateStr) {
   const diff = (Date.now() - new Date(dateStr)) / 1000;
   if (diff < 3600) return `${Math.floor(diff / 60)}분 전`;
@@ -65,32 +82,13 @@ function VideoCard({ video, rank }) {
   );
 }
 
-function TabBtn({ active, onClick, children }) {
+function Btn({ active, onClick, children, color = "#111" }) {
   return (
     <button onClick={onClick} style={{
-      background: active ? "#111" : "#fff", color: active ? "#fff" : "#555",
-      border: `1px solid ${active ? "#111" : "#ddd"}`,
-      borderRadius: 99, padding: "6px 16px", fontSize: 13, cursor: "pointer"
-    }}>{children}</button>
-  );
-}
-
-function RegionBtn({ active, onClick, children }) {
-  return (
-    <button onClick={onClick} style={{
-      background: active ? "#FF0000" : "#fff", color: active ? "#fff" : "#555",
-      border: `1px solid ${active ? "#FF0000" : "#ddd"}`,
-      borderRadius: 99, padding: "5px 14px", fontSize: 12, cursor: "pointer"
-    }}>{children}</button>
-  );
-}
-
-function PeriodBtn({ active, onClick, children }) {
-  return (
-    <button onClick={onClick} style={{
-      background: active ? "#4A90E2" : "#fff", color: active ? "#fff" : "#555",
-      border: `1px solid ${active ? "#4A90E2" : "#ddd"}`,
-      borderRadius: 99, padding: "5px 14px", fontSize: 12, cursor: "pointer"
+      background: active ? color : "#fff",
+      color: active ? "#fff" : "#555",
+      border: `1px solid ${active ? color : "#ddd"}`,
+      borderRadius: 99, padding: "5px 14px", fontSize: 12, cursor: "pointer", whiteSpace: "nowrap"
     }}>{children}</button>
   );
 }
@@ -103,38 +101,32 @@ export default function App() {
   const [region, setRegion] = useState("KR");
   const [tab, setTab] = useState("trending");
   const [period, setPeriod] = useState(7);
+  const [category, setCategory] = useState("0");
 
   const today = new Date().toLocaleDateString("ko-KR", {
     year: "numeric", month: "long", day: "numeric", weekday: "long"
   });
 
-  async function fetchVideos(reg, type, days) {
+  async function fetchVideos(reg, type, days, cat) {
     setLoading(true);
     setError("");
     setVideos([]);
 
     const regionInfo = REGIONS.find(r => r.code === reg);
     const lang = regionInfo?.lang || "ko";
-
     const publishedAfter = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
 
     try {
       let items = [];
 
       if (type === "shorts") {
-        const shortsQuery = { KR: "%EC%87%BC%EC%B8%A0", US: "%23Shorts", JP: "%23Shorts+%E6%97%A5%E6%9C%AC%E8%AA%9E" };
-        const searchRes = await fetch(
-          `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&videoDuration=short&q=${shortsQuery[reg]}&regionCode=${reg}&relevanceLanguage=${lang}&publishedAfter=${publishedAfter}&order=viewCount&maxResults=20&key=${API_KEY}`
-        );
+        const q = encodeURIComponent(SHORTS_QUERY[reg] || "#Shorts");
+        let url = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&videoDuration=short&q=${q}&regionCode=${reg}&relevanceLanguage=${lang}&publishedAfter=${publishedAfter}&order=viewCount&maxResults=20&key=${API_KEY}`;
+        if (cat !== "0") url += `&videoCategoryId=${cat}`;
+        const searchRes = await fetch(url);
         const searchData = await searchRes.json();
         if (searchData.error) throw new Error(searchData.error.message);
-        // 해당 지역 언어 채널만 필터
-        const regionItems = (searchData.items || []).filter(i =>
-          i.snippet.defaultAudioLanguage === lang ||
-          i.snippet.defaultLanguage === lang ||
-          !i.snippet.defaultAudioLanguage
-        );
-        const videoIds = regionItems.map(i => i.id.videoId).join(",");
+        const videoIds = (searchData.items || []).map(i => i.id.videoId).join(",");
         if (videoIds) {
           const statsRes = await fetch(
             `https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics&id=${videoIds}&key=${API_KEY}`
@@ -143,17 +135,14 @@ export default function App() {
           items = statsData.items || [];
         }
       } else {
-        // 트렌딩은 regionCode로 정확하게 해당 국가 콘텐츠만 나옴
-        const trendRes = await fetch(
-          `https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics&chart=mostPopular&regionCode=${reg}&maxResults=20&key=${API_KEY}`
-        );
+        let url = `https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics&chart=mostPopular&regionCode=${reg}&maxResults=20&key=${API_KEY}`;
+        if (cat !== "0") url += `&videoCategoryId=${cat}`;
+        const trendRes = await fetch(url);
         const trendData = await trendRes.json();
         if (trendData.error) throw new Error(trendData.error.message);
-        items = (trendData.items || []).filter(i => {
-          const pub = new Date(i.snippet.publishedAt).getTime();
-          return pub >= Date.now() - days * 24 * 60 * 60 * 1000;
-        });
-        if (items.length === 0) items = trendData.items || [];
+        const all = trendData.items || [];
+        items = all.filter(i => new Date(i.snippet.publishedAt).getTime() >= Date.now() - days * 24 * 60 * 60 * 1000);
+        if (items.length === 0) items = all;
       }
 
       setVideos(items.slice(0, 15).map(item => ({
@@ -173,7 +162,12 @@ export default function App() {
     setLoading(false);
   }
 
-  useEffect(() => { fetchVideos(region, tab, period); }, []);
+  useEffect(() => { fetchVideos(region, tab, period, category); }, []);
+
+  const update = (r, t, d, c) => {
+    setRegion(r); setTab(t); setPeriod(d); setCategory(c);
+    fetchVideos(r, t, d, c);
+  };
 
   return (
     <div style={{ maxWidth: 680, margin: "0 auto", padding: "20px 16px", fontFamily: "sans-serif", background: "#f9f9f9", minHeight: "100vh" }}>
@@ -182,26 +176,36 @@ export default function App() {
           <h1 style={{ fontSize: 20, fontWeight: 700, margin: 0 }}>YouTube 인기 콘텐츠</h1>
           <p style={{ fontSize: 12, color: "#999", marginTop: 3 }}>{today}</p>
         </div>
-        <button onClick={() => fetchVideos(region, tab, period)} style={{
+        <button onClick={() => fetchVideos(region, tab, period, category)} style={{
           background: "#fff", border: "1px solid #ddd", borderRadius: 8,
           padding: "7px 14px", fontSize: 13, cursor: "pointer"
         }}>🔄 새로고침</button>
       </div>
 
+      {/* 탭 */}
       <div style={{ display: "flex", gap: 8, marginBottom: 10, flexWrap: "wrap" }}>
-        <TabBtn active={tab === "trending"} onClick={() => { setTab("trending"); fetchVideos(region, "trending", period); }}>🔥 트렌딩</TabBtn>
-        <TabBtn active={tab === "shorts"} onClick={() => { setTab("shorts"); fetchVideos(region, "shorts", period); }}>▶ Shorts</TabBtn>
+        <Btn active={tab === "trending"} color="#111" onClick={() => update(region, "trending", period, category)}>🔥 트렌딩</Btn>
+        <Btn active={tab === "shorts"} color="#111" onClick={() => update(region, "shorts", period, category)}>▶ Shorts</Btn>
       </div>
 
+      {/* 지역 */}
       <div style={{ display: "flex", gap: 8, marginBottom: 10, flexWrap: "wrap" }}>
         {REGIONS.map(r => (
-          <RegionBtn key={r.code} active={region === r.code} onClick={() => { setRegion(r.code); fetchVideos(r.code, tab, period); }}>{r.label}</RegionBtn>
+          <Btn key={r.code} active={region === r.code} color="#FF0000" onClick={() => update(r.code, tab, period, category)}>{r.label}</Btn>
         ))}
       </div>
 
-      <div style={{ display: "flex", gap: 8, marginBottom: 18, flexWrap: "wrap" }}>
+      {/* 기간 */}
+      <div style={{ display: "flex", gap: 8, marginBottom: 10, flexWrap: "wrap" }}>
         {PERIODS.map(p => (
-          <PeriodBtn key={p.days} active={period === p.days} onClick={() => { setPeriod(p.days); fetchVideos(region, tab, p.days); }}>{p.label}</PeriodBtn>
+          <Btn key={p.days} active={period === p.days} color="#4A90E2" onClick={() => update(region, tab, p.days, category)}>{p.label}</Btn>
+        ))}
+      </div>
+
+      {/* 카테고리 */}
+      <div style={{ display: "flex", gap: 8, marginBottom: 18, flexWrap: "wrap" }}>
+        {CATEGORIES.map(c => (
+          <Btn key={c.id} active={category === c.id} color="#7B5EA7" onClick={() => update(region, tab, period, c.id)}>{c.label}</Btn>
         ))}
       </div>
 
