@@ -99,7 +99,7 @@ export default function App() {
 
     try {
       // 검색어 없이 해당 지역+언어+기간+조회수순으로 가져오기
-      let searchUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&regionCode=${reg}&publishedAfter=${publishedAfter}&order=viewCount&videoDuration=${duration}&maxResults=20&key=${API_KEY}`;
+      let searchUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&regionCode=${reg}&order=viewCount&videoDuration=${duration}&maxResults=20&key=${API_KEY}`;
       if (cat !== "0") searchUrl += `&videoCategoryId=${cat}`;
 
       const searchRes = await fetch(searchUrl);
